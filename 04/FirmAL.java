@@ -8,7 +8,6 @@ import java.util.ArrayList;
 
 class FirmAL {
 	
-	final static int ARRAY_SIZE = 5; // сколько в нашем массиве будет записей?
 	final static int AGE_FROM = 40; // старше какого возраста (включительно) должен быть сотрудник, чтобы его запись вывести на экран?
 	
 	public static void main(String args[]) {
