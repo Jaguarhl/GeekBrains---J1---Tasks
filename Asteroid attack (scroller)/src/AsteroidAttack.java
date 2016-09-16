@@ -1,7 +1,7 @@
 /*
  * Asteroid Attack scroller game (Java lvl 1 parctice)
  * @author Dmitry Kartsev, based on SpaceInviders of Sergey (biblelamp) - https://github.com/biblelamp
- * @version 0.0.2 16/09/2016
+ * @version 0.1.1 17/09/2016
 */
 import javax.swing.*;
 import java.awt.*;
@@ -42,7 +42,9 @@ public class AsteroidAttack extends JFrame {
     Canvas canvasPanel = new Canvas();
     Random random = new Random();
     PlayerShip playership = new PlayerShip(); // players spaceship
-    ArrayList<Missile> missiles = new ArrayList<Missile>(); // missiles, launched by player
+    Space space = new Space();
+    volatile ArrayList<Missile> missiles = new ArrayList<Missile>(); // missiles, launched by player
+    volatile ArrayList<Asteroid> asteroids = new ArrayList<Asteroid>(); // missiles, launched by player
 
     public static void main(String args[]) {
         new AsteroidAttack().go();
@@ -65,17 +67,19 @@ public class AsteroidAttack extends JFrame {
 
         addKeyListener(new KeyAdapter() {
             public void keyPressed(KeyEvent e) {
-                if ((e.getKeyCode() == LEFT) || (e.getKeyCode() == RIGHT)|| (e.getKeyCode() == UP)|| (e.getKeyCode() == DOWN))
+                if ((e.getKeyCode() == LEFT) || (e.getKeyCode() == RIGHT) || (e.getKeyCode() == UP)|| (e.getKeyCode() == DOWN))
                     playership.setDirection(e.getKeyCode());
                 if (e.getKeyCode() == FIRE)
                     playership.shotMissile();
             }
             public void keyReleased(KeyEvent e) {
-                if ((e.getKeyCode() == LEFT) || (e.getKeyCode() == RIGHT)) {}
+                if ((e.getKeyCode() == LEFT) || (e.getKeyCode() == RIGHT) || (e.getKeyCode() == UP)|| (e.getKeyCode() == DOWN)) {}
                 playership.setDirection(0);
             }
         });
         setVisible(true);
+
+        asteroids.add(new Asteroid(random.nextInt(FIELD_WIDTH), -50, 0, 15)); // let's start
     }
 
     void go() { // main loop of game
@@ -88,6 +92,11 @@ public class AsteroidAttack extends JFrame {
             int i = 0;
             for (Missile missile : missiles) {
                 if(missile.isEnable()) missile.fly();
+                i++;
+            }
+            i = 0;
+            for (Asteroid asteroid : asteroids) {
+                if(asteroid.isEnable()) asteroid.fly();
                 i++;
             }
             clearObjects();
@@ -107,6 +116,18 @@ public class AsteroidAttack extends JFrame {
         for(int i = 0; i < missiles.size(); i++) { // for missiles
             if(!missiles.get(i).isEnable()) missiles.remove(i);
         }
+        // clear dead asteroids
+        for(int i = 0; i < asteroids.size(); i++) { // for missiles
+            if(!asteroids.get(i).isEnable()) {
+                asteroids.remove(i);
+                asteroids.add(new Asteroid(random.nextInt(FIELD_WIDTH), -50, rnd(-3.7, 3.7), (int)rnd(2,10)));
+            }
+        }
+    }
+
+    // some utility for generate positive and negative double values
+    double rnd(double min, double max) {
+        return min + (random.nextDouble() * (max - min));
     }
 
     class PlayerShip { // players ship
@@ -157,6 +178,7 @@ public class AsteroidAttack extends JFrame {
         final int HEIGHT = 30; // for accuracy calc
         final int DY = 30;
         final int SPEED = 4; // speed of missile
+        final int DAMAGE = 25; // what damage it do to asteroid / enemy
         int x, y, flyTime, lastLunch;
         boolean exists;
 
@@ -205,13 +227,73 @@ public class AsteroidAttack extends JFrame {
 
     class Asteroid { // asteroid, that attacks player
 
+        final int SPRITE_CELL = 72; // size of sprite cell
+        final int RADIUS = 30; // for interaction calc
+        final int DY = 30;
+        final int DAMAGE = 10; // what damage it do on crash
+
+        int speed = 7; // speed of asteroid flying
+        int anim_speed = 3; // speed of animation
+        int x, y, flyTime, animTime, animPhase; // current position of asteroid, what course it is flying and phase of animation
+        double traectory; // coeff for X dislocation
+        boolean exists;
+
+        Asteroid (int x, int y, double direction, int speed)
+        {
+            this.x = x; // starting position
+            this.y = y;
+            this.traectory = direction;
+            this.flyTime = 0;
+            this.animTime = 0;
+            this.speed = speed;
+            this.anim_speed = speed / 2;
+            this.exists = true;
+        }
+
+        void fly() {
+            if (exists) {
+                if(this.flyTime > this.speed) {// checking, if our missile not too hurry )
+                    y += DY;
+                    x += this.traectory;
+                    this.exists = (y + DY) < FIELD_HEIGHT + RADIUS;
+                    this.flyTime = 0;
+                    System.out.println(exists);
+                    System.out.println(x + "," + y);
+                }
+                else this.flyTime++;
+
+                if(this.animTime >= this.anim_speed) {
+                    if(this.animPhase < 18) this.animPhase++;
+                    else this.animPhase = 0;
+                    animTime = 0;
+                }
+                else this.animTime++;
+            }
+        }
+
+        void disable() { exists = false; }
+
+        boolean isEnable() { return this.exists; }
+
+        int getX() { return x; }
+        int getY() { return y; }
+
         void paint(Graphics g) {
-            //g.drawImage(asteroid, x*POINT_RADIUS, y*POINT_RADIUS, null);
+            g.drawImage(asteroid, x-(RADIUS/2), y-(RADIUS/2), x-(RADIUS/2)+SPRITE_CELL, y-(RADIUS/2)+SPRITE_CELL, this.animPhase*SPRITE_CELL, 0, this.animPhase*SPRITE_CELL+SPRITE_CELL, SPRITE_CELL, null);
         }
     }
 
-    class Wave { // wave of asteroid attack
+    class Space { // wave of asteroid attack
 
+        volatile ArrayList<Asteroid> space = new ArrayList<Asteroid>();
+
+        void generateSpace() {
+            space.add(new Asteroid(random.nextInt(FIELD_WIDTH), -50, 0, 7));
+        }
+
+        void paint(Graphics g) {
+            for (Asteroid asteroid : space) asteroid.paint(g);
+        }
     }
 
     class Canvas extends JPanel {
@@ -222,6 +304,9 @@ public class AsteroidAttack extends JFrame {
                 playership.paint(g);
                 for (Missile missile : missiles) {
                     if (missile.isEnable()) missile.paint(g);
+                }
+                for (Asteroid asteroid : asteroids) {
+                    if (asteroid.isEnable()) asteroid.paint(g);
                 }
                 /*wave.paint(g);
                 flash.paint(g);
