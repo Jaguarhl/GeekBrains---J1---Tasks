@@ -12,6 +12,7 @@ import javax.imageio.*;
 import java.util.*;
 import java.io.*;
 import java.util.ArrayList;
+import java.lang.*;
 
 public class AsteroidAttack extends JFrame {
 
@@ -31,20 +32,21 @@ public class AsteroidAttack extends JFrame {
     final int DOWN = 40;
     final int UP = 38;
     final int FIRE = 32;
-    final int GAME_SPEED = 20; // speed of game
+    final int GAME_SPEED = 5; // speed of game
     public float timeoutMin = 1;
     public float timeoutMax = 1.5f;
     private float curTimeout;
     private static float tmpSpeed;
     private float timeout;
     public static boolean gameOver;
-    Image asteroid, ship, missile; // sprites for asteroids, spaceship, missile
+    Image asteroid, ship, missile, m_explosion; // sprites for asteroids, spaceship, missile, explosive
     Canvas canvasPanel = new Canvas();
     Random random = new Random();
     PlayerShip playership = new PlayerShip(); // players spaceship
     Space space = new Space();
     volatile ArrayList<Missile> missiles = new ArrayList<Missile>(); // missiles, launched by player
     volatile ArrayList<Asteroid> asteroids = new ArrayList<Asteroid>(); // missiles, launched by player
+    volatile ArrayList<MissileBoom> m_explosions = new ArrayList<MissileBoom>(); // missile explosions
 
     public static void main(String args[]) {
         new AsteroidAttack().go();
@@ -63,6 +65,7 @@ public class AsteroidAttack extends JFrame {
             ship = ImageIO.read(new File("img/spaceship.png"));
             asteroid = ImageIO.read(new File("img/asteroid.png"));
             missile = ImageIO.read(new File("img/missile.png"));
+            m_explosion = ImageIO.read(new File("img/m_explosion.png"));
         } catch(IOException e) { e.printStackTrace(); }
 
         addKeyListener(new KeyAdapter() {
@@ -99,6 +102,10 @@ public class AsteroidAttack extends JFrame {
                 if(asteroid.isEnable()) asteroid.fly();
                 i++;
             }
+            for (MissileBoom missile_boom : m_explosions) {
+                if(missile_boom.isEnable()) missile_boom.explode();
+                i++;
+            }
             clearObjects();
             /*flash.show();
             bang.show();
@@ -120,8 +127,12 @@ public class AsteroidAttack extends JFrame {
         for(int i = 0; i < asteroids.size(); i++) { // for missiles
             if(!asteroids.get(i).isEnable()) {
                 asteroids.remove(i);
-                asteroids.add(new Asteroid(random.nextInt(FIELD_WIDTH), -50, rnd(-3.7, 3.7), (int)rnd(2,10)));
+                asteroids.add(new Asteroid(random.nextInt(FIELD_WIDTH), -50, rnd(-3.7, 3.7), (int)rnd(14,38)));
             }
+        }
+        // if explosion is already gone, than we do not need it
+        for(int i = 0; i < m_explosions.size(); i++) { // for missiles
+            if(!m_explosions.get(i).isEnable()) m_explosions.remove(i);
         }
     }
 
@@ -177,8 +188,8 @@ public class AsteroidAttack extends JFrame {
         final int WIDTH = 2; // for accuracy calc
         final int HEIGHT = 30; // for accuracy calc
         final int DY = 30;
-        final int SPEED = 4; // speed of missile
-        final int DAMAGE = 25; // what damage it do to asteroid / enemy
+        final int SPEED = 16; // speed of missile
+        final int DAMAGE = 35; // what damage it do to asteroid / enemy
         int x, y, flyTime, lastLunch;
         boolean exists;
 
@@ -209,7 +220,24 @@ public class AsteroidAttack extends JFrame {
                     this.flyTime = 0;
                 }
                 else this.flyTime++;
+
+                if(checkTarget(this.x, this.y)) {
+                    this.exists = false; // our missile is exploded
+                    m_explosions.add(new MissileBoom(x, y));
+                    System.out.println("Gotta! BOOM!!!");
+                }
             }
+        }
+
+        boolean checkTarget(int x, int y) {
+            for (Asteroid asteroid : asteroids) {
+                double d = Math.sqrt(Math.pow((double)asteroid.getX()-(double)x, 2) + Math.pow((double)asteroid.getY()-(double)y, 2));
+                if((asteroid.isEnable()) && (d <= asteroid.getRadius())) {
+                    asteroid.getDamage(DAMAGE);
+                    return true;
+                }
+            }
+            return false;
         }
 
         void disable() { exists = false; }
@@ -228,15 +256,17 @@ public class AsteroidAttack extends JFrame {
     class Asteroid { // asteroid, that attacks player
 
         final int SPRITE_CELL = 72; // size of sprite cell
-        final int RADIUS = 30; // for interaction calc
+        final int RADIUS = 55; // for interaction calc
         final int DY = 30;
         final int DAMAGE = 10; // what damage it do on crash
+        final int ANIM_FRAMES = 18; // how many frames do we have for animation
 
         int speed = 7; // speed of asteroid flying
-        int anim_speed = 3; // speed of animation
+        int anim_speed = 12; // speed of animation
         int x, y, flyTime, animTime, animPhase; // current position of asteroid, what course it is flying and phase of animation
         double traectory; // coeff for X dislocation
-        boolean exists;
+        boolean exists; // is it is?
+        int live; // current level of durability (how much damage it needed for destroying)
 
         Asteroid (int x, int y, double direction, int speed)
         {
@@ -247,6 +277,7 @@ public class AsteroidAttack extends JFrame {
             this.animTime = 0;
             this.speed = speed;
             this.anim_speed = speed / 2;
+            this.live = 20;
             this.exists = true;
         }
 
@@ -263,8 +294,53 @@ public class AsteroidAttack extends JFrame {
                 else this.flyTime++;
 
                 if(this.animTime >= this.anim_speed) {
-                    if(this.animPhase < 18) this.animPhase++;
+                    if(this.animPhase < ANIM_FRAMES) this.animPhase++;
                     else this.animPhase = 0;
+                    animTime = 0;
+                }
+                else this.animTime++;
+            }
+        }
+
+        void disable() { exists = false; }
+
+        boolean isEnable() { return this.exists; }
+
+        int getX() { return x; }
+        int getY() { return y; }
+        void getDamage(int damage) {
+            this.live -= damage;
+            if(this.live <=0 ) this.exists = false; // if asteroid is destroed, let's kill it
+        }
+        int getRadius() { return RADIUS; }
+
+        void paint(Graphics g) {
+            g.drawImage(asteroid, x-(RADIUS/2), y-(RADIUS/2), x-(RADIUS/2)+SPRITE_CELL, y-(RADIUS/2)+SPRITE_CELL, this.animPhase*SPRITE_CELL, 0, this.animPhase*SPRITE_CELL+SPRITE_CELL, SPRITE_CELL, null);
+        }
+    }
+
+    class MissileBoom { // explosion after missile hit
+
+        final int SPRITE_CELL = 72; // size of sprite cell
+        final int ANIM_SPEED = 1; // speed of animation
+        final int ANIM_FRAMES = 71; // how many frames do we have for animation
+
+        int x, y, animTime, animPhase; // position of explosion and phase of animation
+        boolean exists; // is it is?
+
+        MissileBoom (int x, int y)
+        {
+            this.x = x; // starting position
+            this.y = y;
+            this.animTime = 0;
+            this.exists = true;
+        }
+
+        void explode() {
+            if (exists) {
+                if(this.animTime >= ANIM_SPEED) {
+                    if(this.animPhase < ANIM_FRAMES) this.animPhase++;
+                    else this.exists = false; // end of explosion
                     animTime = 0;
                 }
                 else this.animTime++;
@@ -279,7 +355,7 @@ public class AsteroidAttack extends JFrame {
         int getY() { return y; }
 
         void paint(Graphics g) {
-            g.drawImage(asteroid, x-(RADIUS/2), y-(RADIUS/2), x-(RADIUS/2)+SPRITE_CELL, y-(RADIUS/2)+SPRITE_CELL, this.animPhase*SPRITE_CELL, 0, this.animPhase*SPRITE_CELL+SPRITE_CELL, SPRITE_CELL, null);
+            g.drawImage(m_explosion, x-(SPRITE_CELL/2), y-(SPRITE_CELL/2), x-(SPRITE_CELL/2)+SPRITE_CELL, y-(SPRITE_CELL/2)+SPRITE_CELL, this.animPhase*SPRITE_CELL, 0, this.animPhase*SPRITE_CELL+SPRITE_CELL, SPRITE_CELL, null);
         }
     }
 
@@ -307,6 +383,9 @@ public class AsteroidAttack extends JFrame {
                 }
                 for (Asteroid asteroid : asteroids) {
                     if (asteroid.isEnable()) asteroid.paint(g);
+                }
+                for (MissileBoom missile_boom : m_explosions) {
+                    if (missile_boom.isEnable()) missile_boom.paint(g);
                 }
                 /*wave.paint(g);
                 flash.paint(g);
