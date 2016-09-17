@@ -94,19 +94,14 @@ public class AsteroidAttack extends JFrame {
             canvasPanel.repaint();
             playership.move();
             open_space.slide();
-            int i = 0;
             for (Missile missile : missiles) {
                 if(missile.isEnable()) missile.fly();
-                i++;
             }
-            i = 0;
             for (Asteroid asteroid : asteroids) {
                 if(asteroid.isEnable()) asteroid.fly();
-                i++;
             }
             for (MissileBoom missile_boom : m_explosions) {
                 if(missile_boom.isEnable()) missile_boom.explode();
-                i++;
             }
             clearObjects();
             /*flash.show();
@@ -162,7 +157,7 @@ public class AsteroidAttack extends JFrame {
         void move() { // spaceship can move
             if (direction == LEFT && x > 40) x -= DX;
             if (direction == RIGHT && x < FIELD_WIDTH - WIDTH - 16) x += DX;
-            if (direction == DOWN && y < FIELD_HEIGHT - HEIGHT - 16) y += DY;
+            if (direction == DOWN && y < FIELD_HEIGHT - HEIGHT - RADIUS*2) y += DY;
             if (direction == UP && y > FIELD_HEIGHT/2 - HEIGHT - 16) y -= DY;
         }
 
@@ -383,7 +378,7 @@ public class AsteroidAttack extends JFrame {
     }
 
     class Space { // wave of asteroid attack
-        final int STEP = 1; // step for spacewallpapper scroll
+        final int STEP = 1; // step for space wallpaper scroll
         final int SPEED = 35; // speed of animation
         final int ANIM_FRAMES = 821;
 
