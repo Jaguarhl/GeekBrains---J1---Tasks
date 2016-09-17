@@ -1,7 +1,7 @@
 /*
  * Asteroid Attack scroller game (Java lvl 1 parctice)
  * @author Dmitry Kartsev, based on SpaceInviders of Sergey (biblelamp) - https://github.com/biblelamp
- * @version 0.1.1 17/09/2016
+ * @version 0.3.1 18/09/2016
 */
 import javax.swing.*;
 import java.awt.*;
@@ -26,7 +26,6 @@ public class AsteroidAttack extends JFrame {
     final int STEP_X = 5; // wave step left-right
     final int STEP_Y = 15; // wave step down
     final int GROUND_Y = FIELD_HEIGHT - 20;
-    final int POINT_RADIUS = 80; // size of one point
     final int LEFT = 37; // key codes
     final int RIGHT = 39;
     final int DOWN = 40;
@@ -39,11 +38,12 @@ public class AsteroidAttack extends JFrame {
     private static float tmpSpeed;
     private float timeout;
     public static boolean gameOver;
-    Image asteroid, ship, missile, m_explosion; // sprites for asteroids, spaceship, missile, explosive
+    public int countScore; // point we got while playing
+    Image asteroid, ship, missile, m_explosion, space; // sprites for asteroids, spaceship, missile, explosive, space
     Canvas canvasPanel = new Canvas();
     Random random = new Random();
     PlayerShip playership = new PlayerShip(); // players spaceship
-    Space space = new Space();
+    Space open_space = new Space();
     volatile ArrayList<Missile> missiles = new ArrayList<Missile>(); // missiles, launched by player
     volatile ArrayList<Asteroid> asteroids = new ArrayList<Asteroid>(); // missiles, launched by player
     volatile ArrayList<MissileBoom> m_explosions = new ArrayList<MissileBoom>(); // missile explosions
@@ -66,6 +66,7 @@ public class AsteroidAttack extends JFrame {
             asteroid = ImageIO.read(new File("img/asteroid.png"));
             missile = ImageIO.read(new File("img/missile.png"));
             m_explosion = ImageIO.read(new File("img/m_explosion.png"));
+            space = ImageIO.read(new File("img/space.jpg"));
         } catch(IOException e) { e.printStackTrace(); }
 
         addKeyListener(new KeyAdapter() {
@@ -92,6 +93,7 @@ public class AsteroidAttack extends JFrame {
             } catch (Exception e) { e.printStackTrace(); }
             canvasPanel.repaint();
             playership.move();
+            open_space.slide();
             int i = 0;
             for (Missile missile : missiles) {
                 if(missile.isEnable()) missile.fly();
@@ -142,17 +144,18 @@ public class AsteroidAttack extends JFrame {
     }
 
     class PlayerShip { // players ship
-        final int WIDTH = 26;
-        final int HEIGHT = 16;
-        final int DX = 5;
-        final int DY = 5;
+        final int RADIUS = 25; // radius of playership to check damages
+        final int DX = 2;
+        final int DY = 2;
         final long DELAY = 1500; // delay for next lunch
         int x, y, direction;
         long lastLunch; // here we will store last lunch time
+        int health; // if it is less then 1 - game over
 
         public PlayerShip() {
             x = 400;
-            y = FIELD_HEIGHT - HEIGHT - 30;
+            y = FIELD_HEIGHT - HEIGHT - 100;
+            health = 100;
             lastLunch = System.currentTimeMillis() - 1500; // this is needed to fire from fist seconds of game
         }
 
@@ -177,10 +180,17 @@ public class AsteroidAttack extends JFrame {
 
         int getX() { return x; }
         int getY() { return y; }
+        int getRadius() { return RADIUS; }
         int getWidth() { return WIDTH; }
+        int getHealth() { return health; }
+        void getDamage(int damage) {
+            m_explosions.add(new MissileBoom(x, y));
+            health -= damage;
+            if(health <= 0) gameOver = true;
+        }
 
         void paint(Graphics g) {
-            g.drawImage(ship, x-(POINT_RADIUS/2), y-(POINT_RADIUS/2), null);
+            g.drawImage(ship, x-RADIUS, y-RADIUS, null);
         }
     }
 
@@ -190,6 +200,7 @@ public class AsteroidAttack extends JFrame {
         final int DY = 30;
         final int SPEED = 16; // speed of missile
         final int DAMAGE = 35; // what damage it do to asteroid / enemy
+        int bonus = 15; // score bonus for destroying asteroid
         int x, y, flyTime, lastLunch;
         boolean exists;
 
@@ -224,15 +235,15 @@ public class AsteroidAttack extends JFrame {
                 if(checkTarget(this.x, this.y)) {
                     this.exists = false; // our missile is exploded
                     m_explosions.add(new MissileBoom(x, y));
-                    System.out.println("Gotta! BOOM!!!");
+                    countScore += bonus;
                 }
             }
         }
 
         boolean checkTarget(int x, int y) {
             for (Asteroid asteroid : asteroids) {
-                double d = Math.sqrt(Math.pow((double)asteroid.getX()-(double)x, 2) + Math.pow((double)asteroid.getY()-(double)y, 2));
-                if((asteroid.isEnable()) && (d <= asteroid.getRadius())) {
+                // here we check, if our missile got to radius of asteroid
+                if((asteroid.isEnable()) && (Math.sqrt(Math.pow((double)asteroid.getX()-(double)x, 2) + Math.pow((double)asteroid.getY()-(double)y, 2)) <= asteroid.getRadius())) {
                     asteroid.getDamage(DAMAGE);
                     return true;
                 }
@@ -256,7 +267,7 @@ public class AsteroidAttack extends JFrame {
     class Asteroid { // asteroid, that attacks player
 
         final int SPRITE_CELL = 72; // size of sprite cell
-        final int RADIUS = 55; // for interaction calc
+        final int RADIUS = 35; // for interaction calc
         final int DY = 30;
         final int DAMAGE = 10; // what damage it do on crash
         final int ANIM_FRAMES = 18; // how many frames do we have for animation
@@ -283,7 +294,7 @@ public class AsteroidAttack extends JFrame {
 
         void fly() {
             if (exists) {
-                if(this.flyTime > this.speed) {// checking, if our missile not too hurry )
+                if(this.flyTime > this.speed) {// checking, if our asteroid not too hurry )
                     y += DY;
                     x += this.traectory;
                     this.exists = (y + DY) < FIELD_HEIGHT + RADIUS;
@@ -299,6 +310,8 @@ public class AsteroidAttack extends JFrame {
                     animTime = 0;
                 }
                 else this.animTime++;
+
+                checkCrash(x, y);
             }
         }
 
@@ -312,10 +325,20 @@ public class AsteroidAttack extends JFrame {
             this.live -= damage;
             if(this.live <=0 ) this.exists = false; // if asteroid is destroed, let's kill it
         }
+        void doDamage() {
+            this.exists = false; // if asteroid is destroed, let's kill it
+            playership.getDamage(DAMAGE);
+        }
+        boolean checkCrash(int x, int y) { // check, if asteroid touches playership (are radiuses of asteroid and spaceship in touch)
+            if((this.isEnable()) && (Math.sqrt(Math.pow((double)playership.getX() - (double)this.x, 2) + Math.pow((double)playership.getY() - (double)this.y, 2)) <= this.getRadius() + playership.getRadius())) {
+                this.doDamage();
+            }
+            return false;
+        }
         int getRadius() { return RADIUS; }
 
         void paint(Graphics g) {
-            g.drawImage(asteroid, x-(RADIUS/2), y-(RADIUS/2), x-(RADIUS/2)+SPRITE_CELL, y-(RADIUS/2)+SPRITE_CELL, this.animPhase*SPRITE_CELL, 0, this.animPhase*SPRITE_CELL+SPRITE_CELL, SPRITE_CELL, null);
+            g.drawImage(asteroid, x-RADIUS, y-RADIUS, x-RADIUS+SPRITE_CELL, y-RADIUS+SPRITE_CELL, this.animPhase*SPRITE_CELL, 0, this.animPhase*SPRITE_CELL+SPRITE_CELL, SPRITE_CELL, null);
         }
     }
 
@@ -360,15 +383,28 @@ public class AsteroidAttack extends JFrame {
     }
 
     class Space { // wave of asteroid attack
+        final int STEP = 1; // step for spacewallpapper scroll
+        final int SPEED = 35; // speed of animation
+        final int ANIM_FRAMES = 821;
 
-        volatile ArrayList<Asteroid> space = new ArrayList<Asteroid>();
+        int animPhase, animTime;
 
-        void generateSpace() {
-            space.add(new Asteroid(random.nextInt(FIELD_WIDTH), -50, 0, 7));
+        Space () {
+            this.animPhase = ANIM_FRAMES; // starting frame
+            this.animTime = 0;
+        }
+
+        void slide() {
+            if(this.animTime >= SPEED) {
+                if(this.animPhase > 0) this.animPhase-=STEP;
+                else this.animPhase = ANIM_FRAMES;
+                animTime = 0;
+            }
+            else this.animTime++;
         }
 
         void paint(Graphics g) {
-            for (Asteroid asteroid : space) asteroid.paint(g);
+           g.drawImage(space, 0, 0, FIELD_WIDTH, FIELD_HEIGHT, 0, this.animPhase * STEP, FIELD_WIDTH, FIELD_HEIGHT + this.animPhase * STEP, null);
         }
     }
 
@@ -376,6 +412,10 @@ public class AsteroidAttack extends JFrame {
         @Override
         public void paint(Graphics g) {
             super.paint(g);
+            open_space.paint(g);
+            paintTextAndLine(g);
+            paintNumber(g, countScore, 110, 20);
+            paintNumber(g, playership.getHealth(), 390, 20);
             if (!gameOver) {
                 playership.paint(g);
                 for (Missile missile : missiles) {
@@ -387,10 +427,67 @@ public class AsteroidAttack extends JFrame {
                 for (MissileBoom missile_boom : m_explosions) {
                     if (missile_boom.isEnable()) missile_boom.paint(g);
                 }
-                /*wave.paint(g);
-                flash.paint(g);
-                rays.paint(g);*/
             }
+        }
+    }
+
+    void paintTextAndLine(Graphics g) { // paint score, lives and green line
+        final int[][] SCORE = {
+                {1,1,1,1,1,1,0,1,1,1,1,1,1,0,1,1,1,1,1,1,0,1,1,1,1,1,1,0,1,1,1,1,1,1},
+                {1,0,0,0,0,0,0,1,0,0,0,0,0,0,1,0,0,0,0,1,0,1,0,0,0,0,0,0,0,0,0,0,0,0},
+                {1,1,1,1,1,1,0,1,0,0,0,0,0,0,1,0,0,0,0,1,0,1,0,0,0,0,0,0,1,1,1,1,1,1},
+                {0,0,0,0,0,1,0,1,0,0,0,0,0,0,1,0,0,0,0,1,0,1,0,0,0,0,0,0,0,0,0,0,0,0},
+                {1,1,1,1,1,1,0,1,1,1,1,1,1,0,1,1,1,1,1,1,0,1,0,0,0,0,0,0,1,1,1,1,1,1}
+        };
+        final int[][] LIVES = {
+                {1,0,0,0,0,0,0,1,0,1,0,0,0,1,0,1,1,1,1,1,1,0,1,1,1,1,1,1},
+                {1,0,0,0,0,0,0,1,0,1,0,0,0,1,0,0,0,0,0,0,0,0,1,0,0,0,0,0},
+                {1,0,0,0,0,0,0,1,0,0,1,0,1,0,0,1,1,1,1,1,1,0,1,1,1,1,1,1},
+                {1,0,0,0,0,0,0,1,0,0,1,0,1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1},
+                {1,1,1,1,1,1,0,1,0,0,0,1,0,0,0,1,1,1,1,1,1,0,1,1,1,1,1,1}
+        };
+        final int[][] GAME_OVER = {
+                {1,1,1,1,1,1,0,1,1,1,1,1,1,0,1,1,1,1,1,1,1,0,1,1,1,1,1,1,0,0,0,0,0,1,1,1,1,1,1,0,1,0,0,0,1,0,1,1,1,1,1,1,0,1,1,1,1,1,1},
+                {1,0,0,0,0,1,0,0,0,0,0,0,0,0,1,0,0,1,0,0,1,0,0,0,0,0,0,0,0,0,0,0,0,1,0,0,0,0,1,0,1,0,0,0,1,0,0,0,0,0,0,0,0,1,0,0,0,0,0},
+                {1,0,0,0,0,1,0,1,1,1,1,1,1,0,1,0,0,1,0,0,1,0,1,1,1,1,1,1,0,0,0,0,0,1,0,0,0,0,1,0,0,1,0,1,0,0,1,1,1,1,1,1,0,1,0,0,0,0,0},
+                {1,0,0,0,0,1,0,1,0,0,0,0,1,0,1,0,0,1,0,0,1,0,0,0,0,0,0,0,0,0,0,0,0,1,0,0,0,0,1,0,0,1,0,1,0,0,0,0,0,0,0,0,0,1,0,0,0,0,0},
+                {1,1,1,1,1,1,0,1,1,1,1,1,1,0,1,0,0,1,0,0,1,0,1,1,1,1,1,1,0,0,0,0,0,1,1,1,1,1,1,0,0,0,1,0,0,0,1,1,1,1,1,1,0,1,0,0,0,0,0},
+                {0,0,0,0,0,1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0},
+                {1,1,1,1,1,1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0},
+        };
+        g.setColor(Color.white);
+        for (int y = 0; y < SCORE.length; y++) {
+            for (int x = 0; x < SCORE[y].length; x++)
+                if (SCORE[y][x] == 1) g.fillRect(x*POINT_SCALE + 30, y*POINT_SCALE + 20, POINT_SCALE, POINT_SCALE);
+            for (int i = 0; i < LIVES[y].length; i++)
+                if (LIVES[y][i] == 1) g.fillRect(i*POINT_SCALE + 320, y*POINT_SCALE + 20, POINT_SCALE, POINT_SCALE);
+        }
+        if (gameOver)
+            for (int y = 0; y < GAME_OVER.length; y++)
+                for (int x = 0; x < GAME_OVER[y].length; x++)
+                    if (GAME_OVER[y][x] == 1) g.fillRect(x*POINT_SCALE + 170, y*POINT_SCALE + 250, POINT_SCALE, POINT_SCALE);
+    }
+
+    void paintNumber(Graphics g, int number, int x, int y) { // paint numbers (countScore, countLives)
+        final int[][][] NUMBERS = {
+                {{1,1,1,1,1,1}, {1,0,0,0,0,1}, {1,0,0,0,0,1}, {1,0,0,0,0,1}, {1,1,1,1,1,1}}, // 0
+                {{0,0,0,0,0,1}, {0,0,0,0,0,1}, {0,0,0,0,0,1}, {0,0,0,0,0,1}, {0,0,0,0,0,1}}, // 1
+                {{1,1,1,1,1,1}, {0,0,0,0,0,1}, {1,1,1,1,1,1}, {1,0,0,0,0,0}, {1,1,1,1,1,1}}, // 2
+                {{1,1,1,1,1,1}, {0,0,0,0,0,1}, {1,1,1,1,1,1}, {0,0,0,0,0,1}, {1,1,1,1,1,1}}, // 3
+                {{1,0,0,0,0,1}, {1,0,0,0,0,1}, {1,1,1,1,1,1}, {0,0,0,0,0,1}, {0,0,0,0,0,1}}, // 4
+                {{1,1,1,1,1,1}, {1,0,0,0,0,0}, {1,1,1,1,1,1}, {0,0,0,0,0,1}, {1,1,1,1,1,1}}, // 5
+                {{1,1,1,1,1,1}, {1,0,0,0,0,0}, {1,1,1,1,1,1}, {1,0,0,0,0,1}, {1,1,1,1,1,1}}, // 6
+                {{1,1,1,1,1,1}, {0,0,0,0,0,1}, {0,0,0,0,0,1}, {0,0,0,0,0,1}, {0,0,0,0,0,1}}, // 7
+                {{1,1,1,1,1,1}, {1,0,0,0,0,1}, {1,1,1,1,1,1}, {1,0,0,0,0,1}, {1,1,1,1,1,1}}, // 8
+                {{1,1,1,1,1,1}, {1,0,0,0,0,1}, {1,1,1,1,1,1}, {0,0,0,0,0,1}, {1,1,1,1,1,1}}  // 9
+        };
+        String numStr = Integer.toString(number);
+        g.setColor(Color.green);
+        for (int p = 0; p < numStr.length(); p++) {
+            int n = (int) numStr.charAt(p) - 48;
+            for (int i = 0; i < 5; i++)
+                for (int j = 0; j < 6; j++)
+                    if (NUMBERS[n][i][j] == 1) g.fillRect(x + j*POINT_SCALE + p*14, y + i*POINT_SCALE, POINT_SCALE, POINT_SCALE);
         }
     }
 }
