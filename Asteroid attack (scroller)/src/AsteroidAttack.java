@@ -1,7 +1,7 @@
 /*
  * Asteroid Attack scroller game (Java lvl 1 parctice)
  * @author Dmitry Kartsev, based on SpaceInviders of Sergey (biblelamp) - https://github.com/biblelamp
- * @version 0.3.1 18/09/2016
+ * @version 0.4.7 18/09/2016
 */
 import javax.swing.*;
 import java.awt.*;
@@ -92,27 +92,20 @@ public class AsteroidAttack extends JFrame {
                 Thread.sleep(GAME_SPEED);
             } catch (Exception e) { e.printStackTrace(); }
             canvasPanel.repaint();
-            playership.move();
-            open_space.slide();
-            for (Missile missile : missiles) {
-                if(missile.isEnable()) missile.fly();
+            if(!gameOver) playership.move();
+                open_space.slide();
+            if(!gameOver) {
+                for (Missile missile : missiles) {
+                    if (missile.isEnable()) missile.fly();
+                }
+                for (Asteroid asteroid : asteroids) {
+                    if (asteroid.isEnable()) asteroid.fly();
+                }
+                for (MissileBoom missile_boom : m_explosions) {
+                    if (missile_boom.isEnable()) missile_boom.explode();
+                }
+                clearObjects();
             }
-            for (Asteroid asteroid : asteroids) {
-                if(asteroid.isEnable()) asteroid.fly();
-            }
-            for (MissileBoom missile_boom : m_explosions) {
-                if(missile_boom.isEnable()) missile_boom.explode();
-            }
-            clearObjects();
-            /*flash.show();
-            bang.show();
-            ray.fly();
-            rays.fly();
-            wave.nextStep();
-            if (wave.isDestroyed()) { // if the wave completely destroyed
-                wave = new Wave();
-                countLives++;
-            }*/
         }
     }
 
@@ -264,7 +257,7 @@ public class AsteroidAttack extends JFrame {
         final int SPRITE_CELL = 72; // size of sprite cell
         final int RADIUS = 35; // for interaction calc
         final int DY = 30;
-        final int DAMAGE = 10; // what damage it do on crash
+        final int DAMAGE = 11; // what damage it do on crash
         final int ANIM_FRAMES = 18; // how many frames do we have for animation
 
         int speed = 7; // speed of asteroid flying
@@ -410,7 +403,8 @@ public class AsteroidAttack extends JFrame {
             open_space.paint(g);
             paintTextAndLine(g);
             paintNumber(g, countScore, 110, 20);
-            paintNumber(g, playership.getHealth(), 390, 20);
+            //paintNumber(g, playership.getHealth(), 390, 20);
+            paintHealthBar(g, playership.getHealth(), 390, 20);
             if (!gameOver) {
                 playership.paint(g);
                 for (Missile missile : missiles) {
@@ -460,7 +454,7 @@ public class AsteroidAttack extends JFrame {
         if (gameOver)
             for (int y = 0; y < GAME_OVER.length; y++)
                 for (int x = 0; x < GAME_OVER[y].length; x++)
-                    if (GAME_OVER[y][x] == 1) g.fillRect(x*POINT_SCALE + 170, y*POINT_SCALE + 250, POINT_SCALE, POINT_SCALE);
+                    if (GAME_OVER[y][x] == 1) g.fillRect(x*POINT_SCALE + 350, y*POINT_SCALE + 270, POINT_SCALE, POINT_SCALE);
     }
 
     void paintNumber(Graphics g, int number, int x, int y) { // paint numbers (countScore, countLives)
@@ -483,6 +477,44 @@ public class AsteroidAttack extends JFrame {
             for (int i = 0; i < 5; i++)
                 for (int j = 0; j < 6; j++)
                     if (NUMBERS[n][i][j] == 1) g.fillRect(x + j*POINT_SCALE + p*14, y + i*POINT_SCALE, POINT_SCALE, POINT_SCALE);
+        }
+    }
+
+    void paintHealthBar(Graphics g, int number, int x, int y) { // paint numbers (countScore, countLives)
+        final int WHILE_BAR = 10;
+        final int M_BAR_WIDTH = 4; // width of small bar in px
+        final int SPACE = 1; // space between bars
+
+        boolean part = true;
+
+        for(int i = 0; i < WHILE_BAR*2; i++)
+        {
+            double n = (double)number / WHILE_BAR;
+            int l_full = (int)(n*2);
+            double l_fract = n - l_full;
+            if(l_full - i > 0) {
+                g.setColor(Color.yellow);
+                g.fillRect(x + (i * M_BAR_WIDTH), y, M_BAR_WIDTH, 10);
+                g.setColor(Color.green);
+                g.fillRect(x+(i*M_BAR_WIDTH)+1, y+1, M_BAR_WIDTH-2, 8);
+            }
+            else if((l_full - i <= 0) && (l_fract != 0) && part == true) // if we have hot full
+            {
+                g.setColor(Color.yellow);
+                g.fillRect(x + (i * M_BAR_WIDTH), y, M_BAR_WIDTH, 10);
+                g.setColor(Color.black);
+                g.fillRect(x+(i*M_BAR_WIDTH)+1, y+1, M_BAR_WIDTH-2, 4);
+                g.setColor(Color.green);
+                g.fillRect(x+(i*M_BAR_WIDTH)+1, y+5, M_BAR_WIDTH-2, 4);
+                part = false;
+            }
+            else {
+                g.setColor(Color.yellow);
+                g.fillRect(x + (i*M_BAR_WIDTH), y, M_BAR_WIDTH, 10);
+                g.setColor(Color.black);
+                g.fillRect(x+(i*M_BAR_WIDTH)+1, y+1, M_BAR_WIDTH-2, 8);
+            }
+            x += SPACE; // we need it to divide our small bars from ech other
         }
     }
 }
