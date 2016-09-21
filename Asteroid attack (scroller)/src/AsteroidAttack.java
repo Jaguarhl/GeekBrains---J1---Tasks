@@ -1,7 +1,7 @@
 /*
  * Asteroid Attack scroller game (Java lvl 1 parctice)
  * @author Dmitry Kartsev, based on SpaceInviders of Sergey (biblelamp) - https://github.com/biblelamp
- * @version 0.4.7 18/09/2016
+ * @version 0.6.3 21/09/2016
 */
 import javax.swing.*;
 import java.awt.*;
@@ -47,6 +47,8 @@ public class AsteroidAttack extends JFrame {
     volatile ArrayList<Missile> missiles = new ArrayList<Missile>(); // missiles, launched by player
     volatile ArrayList<Asteroid> asteroids = new ArrayList<Asteroid>(); // missiles, launched by player
     volatile ArrayList<MissileBoom> m_explosions = new ArrayList<MissileBoom>(); // missile explosions
+    Keys k = new Keys();
+    private static final ArrayList<Integer> keyChain = new ArrayList<>();;
 
     public static void main(String args[]) {
         new AsteroidAttack().go();
@@ -71,16 +73,14 @@ public class AsteroidAttack extends JFrame {
 
         addKeyListener(new KeyAdapter() {
             public void keyPressed(KeyEvent e) {
-                if ((e.getKeyCode() == LEFT) || (e.getKeyCode() == RIGHT) || (e.getKeyCode() == UP)|| (e.getKeyCode() == DOWN))
-                    playership.setDirection(e.getKeyCode());
-                if (e.getKeyCode() == FIRE)
-                    playership.shotMissile();
+                k.press(e.getKeyCode());
             }
             public void keyReleased(KeyEvent e) {
-                if ((e.getKeyCode() == LEFT) || (e.getKeyCode() == RIGHT) || (e.getKeyCode() == UP)|| (e.getKeyCode() == DOWN)) {}
+                k.reset(e.getKeyCode());
                 playership.setDirection(0);
             }
         });
+
         setVisible(true);
 
         asteroids.add(new Asteroid(random.nextInt(FIELD_WIDTH), -50, 0, 15)); // let's start
@@ -104,6 +104,11 @@ public class AsteroidAttack extends JFrame {
                 for (MissileBoom missile_boom : m_explosions) {
                     if (missile_boom.isEnable()) missile_boom.explode();
                 }
+                if (k.isPressed(KeyEvent.VK_UP)) playership.setDirection(UP);
+                if (k.isPressed(KeyEvent.VK_DOWN)) playership.setDirection(DOWN);
+                if (k.isPressed(KeyEvent.VK_LEFT)) playership.setDirection(LEFT);
+                if (k.isPressed(KeyEvent.VK_RIGHT)) playership.setDirection(RIGHT);
+                if (k.isPressed(KeyEvent.VK_SPACE)) playership.shotMissile();;
                 clearObjects();
             }
         }
@@ -518,3 +523,4 @@ public class AsteroidAttack extends JFrame {
         }
     }
 }
+
