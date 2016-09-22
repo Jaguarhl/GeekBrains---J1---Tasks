@@ -4,19 +4,6 @@ import java.util.ArrayList;
 
 public class Keys{
 
-    public static KeyAdapter DEFAULT_KEY_ADAPTER = new KeyAdapter() {
-
-        @Override
-        public void keyPressed(KeyEvent keyCode) {
-            press(keyCode.getKeyCode());
-        }
-
-        @Override
-        public void keyReleased(KeyEvent keyCode) {
-            reset(keyCode.getKeyCode());
-        }
-    };
-
     // все нажатые кнопки (в данный момент)
     private static final ArrayList<Integer> keyChain = new ArrayList<>();;
 
