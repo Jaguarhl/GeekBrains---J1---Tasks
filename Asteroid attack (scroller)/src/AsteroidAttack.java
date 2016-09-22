@@ -34,7 +34,7 @@ public class AsteroidAttack extends JFrame {
     final int GAME_SPEED = 5; // speed of game
     public static boolean gameOver;
     public int countScore; // point we got while playing
-    Image asteroid, ship, missile, m_explosion, b_on_taget, space; // sprites for asteroids, spaceship, missile, explosive, space
+    Image asteroid, ship, missile, m_explosion, driverflame, space; // sprites for asteroids, spaceship, missile, explosive, space
     Canvas canvasPanel = new Canvas();
     Random random = new Random();
     PlayerShip playership = new PlayerShip(); // players spaceship
@@ -63,7 +63,7 @@ public class AsteroidAttack extends JFrame {
             asteroid = ImageIO.read(new File("img/asteroid.png"));
             missile = ImageIO.read(new File("img/missile.png"));
             m_explosion = ImageIO.read(new File("img/m_explosion.png"));
-            b_on_taget = ImageIO.read(new File("img/bullet_on_target.png"));
+            driverflame = ImageIO.read(new File("img/driveflame.png"));
             space = ImageIO.read(new File("img/space.jpg"));
         } catch(IOException e) { e.printStackTrace(); }
 
@@ -109,6 +109,8 @@ public class AsteroidAttack extends JFrame {
                 if (k.isPressed(KeyEvent.VK_DOWN) && (k.isPressed(KeyEvent.VK_RIGHT))) playership.setDirection(DOWN_AND_RIGHT);
                 if (k.isPressed(KeyEvent.VK_DOWN) && (k.isPressed(KeyEvent.VK_LEFT))) playership.setDirection(DOWN_AND_LEFT);
                 if (k.isPressed(KeyEvent.VK_SPACE) || (k.isPressed(KeyEvent.VK_CONTROL))) playership.shotMissile();
+
+                playership.fly();
                 clearObjects();
             }
         }
@@ -138,19 +140,32 @@ public class AsteroidAttack extends JFrame {
     }
 
     class PlayerShip { // players ship
+        final int[][] FLAME = {
+                {1,1,1,1,1,1,0,1,1,1,1,1,1,0,1,1,1,1,1,1,0,1,1,1,1,1,1,0,1,1,1,1,1,1},
+                {1,0,0,0,0,0,0,1,0,0,0,0,0,0,1,0,0,0,0,1,0,1,0,0,0,0,0,0,0,0,0,0,0,0},
+                {1,1,1,1,1,1,0,1,0,0,0,0,0,0,1,0,0,0,0,1,0,1,0,0,0,0,0,0,1,1,1,1,1,1},
+                {0,0,0,0,0,1,0,1,0,0,0,0,0,0,1,0,0,0,0,1,0,1,0,0,0,0,0,0,0,0,0,0,0,0},
+                {1,1,1,1,1,1,0,1,1,1,1,1,1,0,1,1,1,1,1,1,0,1,0,0,0,0,0,0,1,1,1,1,1,1}
+        };
         final int RADIUS = 25; // radius of playership to check damages
         final int DX = 2;
         final int DY = 2;
         final int WIDTH = 72;
+        final int FLAME_CELL = 5; // width of flame sprite cell
+        final int FLAME_FRAMES = 19;
+        final int ANIM_SPEED = 25; // speed of flame animation
         final long DELAY = 1500; // delay for next lunch
         int x, y, direction;
         long lastLunch, lastShot; // here we will store last lunch time
-        int health; // if it is less then 1 - game over
+        int health, flameTime, flamePhase; // if it is less then 1 - game over
+        boolean wing = true; // from what wing of ship do we start missile this time
 
         public PlayerShip() {
             x = 400;
             y = FIELD_HEIGHT - HEIGHT - 100;
             health = 100;
+            this.flamePhase = 0;
+            this.flameTime = 0;
             lastLunch = System.currentTimeMillis() - 1500; // this is needed to fire from fist seconds of game
             lastShot = System.currentTimeMillis() - 1500; // this is needed to fire from fist seconds of game
         }
@@ -173,9 +188,26 @@ public class AsteroidAttack extends JFrame {
             ray.start(x, y);*/
             System.out.println(System.currentTimeMillis() - lastLunch);
             if((System.currentTimeMillis() - lastLunch) > DELAY) {
-                missiles.add(new Missile(x, y));
+                if(wing) {
+                    missiles.add(new Missile(x, y));
+                    wing = false;
+                }
+                else {
+                    missiles.add(new Missile(x - 39, y));
+                    wing = true;
+                }
                 lastLunch = System.currentTimeMillis();
             }
+        }
+
+        void fly() { // drawing ship animation
+            if(this.flameTime >= ANIM_SPEED) {
+                if(this.flamePhase < FLAME_FRAMES) this.flamePhase++;
+                else this.flamePhase = 0;
+
+                this.flameTime = 0;
+            }
+            else this.flameTime++;
         }
 
         int getX() { return x; }
@@ -190,7 +222,10 @@ public class AsteroidAttack extends JFrame {
         }
 
         void paint(Graphics g) {
+
             g.drawImage(ship, x-RADIUS, y-RADIUS, null);
+            // drawing flame of drivers
+            g.drawImage(driverflame, x-RADIUS+38, y-RADIUS+67, x-RADIUS+38+FLAME_CELL, y-RADIUS+67+12,  this.flamePhase*FLAME_CELL, 0, this.flamePhase*FLAME_CELL+FLAME_CELL, FLAME_CELL, null);
         }
     }
 
