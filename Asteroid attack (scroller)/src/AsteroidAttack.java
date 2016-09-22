@@ -23,31 +23,26 @@ public class AsteroidAttack extends JFrame {
     final int START_LOCATION = 150;
     final int FIELD_DX = 7; // determined experimentally
     final int FIELD_DY = 26;
-    final int STEP_X = 5; // wave step left-right
-    final int STEP_Y = 15; // wave step down
-    final int GROUND_Y = FIELD_HEIGHT - 20;
     final int LEFT = 37; // key codes
     final int RIGHT = 39;
     final int DOWN = 40;
     final int UP = 38;
-    final int FIRE = 32;
+    final int UP_AND_RIGHT = 87;
+    final int UP_AND_LEFT = 85;
+    final int DOWN_AND_RIGHT = 79;
+    final int DOWN_AND_LEFT = 77;
     final int GAME_SPEED = 5; // speed of game
-    public float timeoutMin = 1;
-    public float timeoutMax = 1.5f;
-    private float curTimeout;
-    private static float tmpSpeed;
-    private float timeout;
     public static boolean gameOver;
     public int countScore; // point we got while playing
-    Image asteroid, ship, missile, m_explosion, space; // sprites for asteroids, spaceship, missile, explosive, space
+    Image asteroid, ship, missile, m_explosion, b_on_taget, space; // sprites for asteroids, spaceship, missile, explosive, space
     Canvas canvasPanel = new Canvas();
     Random random = new Random();
     PlayerShip playership = new PlayerShip(); // players spaceship
     Space open_space = new Space();
-    volatile ArrayList<Missile> missiles = new ArrayList<Missile>(); // missiles, launched by player
-    volatile ArrayList<Asteroid> asteroids = new ArrayList<Asteroid>(); // missiles, launched by player
-    volatile ArrayList<MissileBoom> m_explosions = new ArrayList<MissileBoom>(); // missile explosions
-    Keys k = new Keys();
+    volatile ArrayList<Missile> missiles = new ArrayList<>(); // missiles, launched by player
+    volatile ArrayList<Asteroid> asteroids = new ArrayList<>(); // missiles, launched by player
+    volatile ArrayList<MissileBoom> m_explosions = new ArrayList<>(); // missile explosions
+    Keys k = new Keys(); // keyboard utility
     private static final ArrayList<Integer> keyChain = new ArrayList<>();;
 
     public static void main(String args[]) {
@@ -68,6 +63,7 @@ public class AsteroidAttack extends JFrame {
             asteroid = ImageIO.read(new File("img/asteroid.png"));
             missile = ImageIO.read(new File("img/missile.png"));
             m_explosion = ImageIO.read(new File("img/m_explosion.png"));
+            b_on_taget = ImageIO.read(new File("img/bullet_on_target.png"));
             space = ImageIO.read(new File("img/space.jpg"));
         } catch(IOException e) { e.printStackTrace(); }
 
@@ -108,7 +104,11 @@ public class AsteroidAttack extends JFrame {
                 if (k.isPressed(KeyEvent.VK_DOWN)) playership.setDirection(DOWN);
                 if (k.isPressed(KeyEvent.VK_LEFT)) playership.setDirection(LEFT);
                 if (k.isPressed(KeyEvent.VK_RIGHT)) playership.setDirection(RIGHT);
-                if (k.isPressed(KeyEvent.VK_SPACE)) playership.shotMissile();;
+                if (k.isPressed(KeyEvent.VK_UP) && (k.isPressed(KeyEvent.VK_RIGHT))) playership.setDirection(UP_AND_RIGHT);
+                if (k.isPressed(KeyEvent.VK_UP) && (k.isPressed(KeyEvent.VK_LEFT))) playership.setDirection(UP_AND_LEFT);
+                if (k.isPressed(KeyEvent.VK_DOWN) && (k.isPressed(KeyEvent.VK_RIGHT))) playership.setDirection(DOWN_AND_RIGHT);
+                if (k.isPressed(KeyEvent.VK_DOWN) && (k.isPressed(KeyEvent.VK_LEFT))) playership.setDirection(DOWN_AND_LEFT);
+                if (k.isPressed(KeyEvent.VK_SPACE) || (k.isPressed(KeyEvent.VK_CONTROL))) playership.shotMissile();
                 clearObjects();
             }
         }
@@ -122,6 +122,7 @@ public class AsteroidAttack extends JFrame {
         for(int i = 0; i < asteroids.size(); i++) { // for missiles
             if(!asteroids.get(i).isEnable()) {
                 asteroids.remove(i);
+                // and creating new
                 asteroids.add(new Asteroid(random.nextInt(FIELD_WIDTH), -50, rnd(-3.7, 3.7), (int)rnd(14,38)));
             }
         }
@@ -140,9 +141,10 @@ public class AsteroidAttack extends JFrame {
         final int RADIUS = 25; // radius of playership to check damages
         final int DX = 2;
         final int DY = 2;
+        final int WIDTH = 72;
         final long DELAY = 1500; // delay for next lunch
         int x, y, direction;
-        long lastLunch; // here we will store last lunch time
+        long lastLunch, lastShot; // here we will store last lunch time
         int health; // if it is less then 1 - game over
 
         public PlayerShip() {
@@ -150,13 +152,18 @@ public class AsteroidAttack extends JFrame {
             y = FIELD_HEIGHT - HEIGHT - 100;
             health = 100;
             lastLunch = System.currentTimeMillis() - 1500; // this is needed to fire from fist seconds of game
+            lastShot = System.currentTimeMillis() - 1500; // this is needed to fire from fist seconds of game
         }
 
         void move() { // spaceship can move
             if (direction == LEFT && x > 40) x -= DX;
-            if (direction == RIGHT && x < FIELD_WIDTH - WIDTH - 16) x += DX;
+            if (direction == RIGHT && x < FIELD_WIDTH - WIDTH) x += DX;
             if (direction == DOWN && y < FIELD_HEIGHT - HEIGHT - RADIUS*2) y += DY;
             if (direction == UP && y > FIELD_HEIGHT/2 - HEIGHT - 16) y -= DY;
+            if (direction == UP_AND_RIGHT && y > FIELD_HEIGHT/2 - HEIGHT - 16 && x < FIELD_WIDTH - WIDTH ) { y -= DY; x += DX; }
+            if (direction == UP_AND_LEFT && y > FIELD_HEIGHT/2 - HEIGHT - 16 && x > 40) { y -= DY; x -= DX; }
+            if (direction == DOWN_AND_RIGHT && y < FIELD_HEIGHT - HEIGHT - RADIUS*2) { y += DY; x += DX; }
+            if (direction == DOWN_AND_LEFT && y < FIELD_HEIGHT - HEIGHT - RADIUS*2) { y += DY; x -= DX; }
         }
 
         void setDirection(int direction) { this.direction = direction; }
@@ -263,7 +270,7 @@ public class AsteroidAttack extends JFrame {
         final int RADIUS = 35; // for interaction calc
         final int DY = 30;
         final int DAMAGE = 11; // what damage it do on crash
-        final int ANIM_FRAMES = 18; // how many frames do we have for animation
+        final int ANIM_FRAMES = 17; // how many frames do we have for animation
 
         int speed = 7; // speed of asteroid flying
         int anim_speed = 12; // speed of animation
@@ -344,8 +351,7 @@ public class AsteroidAttack extends JFrame {
         int x, y, animTime, animPhase; // position of explosion and phase of animation
         boolean exists; // is it is?
 
-        MissileBoom (int x, int y)
-        {
+        MissileBoom (int x, int y) {
             this.x = x; // starting position
             this.y = y;
             this.animTime = 0;
