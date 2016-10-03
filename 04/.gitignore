@@ -1,3 +1,5 @@
 *.zip
 *.class
 *.txt
+/Firm.class
+/Person.class
